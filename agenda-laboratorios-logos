@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda Laboratórios - Faculdade Logos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+        }
+        .day-cell {
+            min-height: 80px;
+            transition: all 0.2s ease;
+        }
+        .day-cell:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .available { background: linear-gradient(135deg, #10b981, #059669); }
+        .partially-occupied { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .occupied { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .maintenance { background: linear-gradient(135deg, #6b7280, #4b5563); }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Login Screen -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+            <div class="text-center mb-8">
+                <div class="w-20 h-20 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <span class="text-white font-bold text-3xl">FL</span>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Agenda de Laboratórios</h1>
+                <p class="text-gray-600">Faculdade Logos</p>
+            </div>
+            
+            <div class="space-y-6">
+                <div class="text-center">
+                    <p class="text-gray-700 mb-4">Faça login com sua conta do Gmail para acessar o sistema</p>
+                    <div id="g_id_onload"
+                         data-client_id="demo-client-id"
+                         data-callback="handleCredentialResponse">
+                    </div>
+                    <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
+                    
+                    <!-- Demo Login Button -->
+                    <div class="mt-4">
+                        <button id="demoLogin" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
+                            🎯 Login Demo (Professor João)
+                        </button>
+                        <p class="text-xs text-gray-500 mt-2">Para demonstração - clique aqui</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="mainApp" class="hidden">
+        <!-- Header -->
+        <header class="bg-white shadow-lg border-b-4 border-blue-600">
+            <div class="max-w-7xl mx-auto px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+                            <span class="text-white font-bold text-xl">FL</span>
+                        </div>
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-800">Agenda de Laboratórios</h1>
+                            <p class="text-gray-600">Faculdade Logos</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="text-right">
+                            <p class="text-sm text-gray-600">Bem-vindo, <span id="userName">Professor</span></p>
+                            <p class="font-semibold text-gray-800" id="currentDate"></p>
+                        </div>
+                        <button id="dashboardBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors">
+                            📊 Dashboard
+                        </button>
+                        <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors">
+                            Sair
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+    <div class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Controls -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center space-x-4">
+                    <label class="text-gray-700 font-medium">Laboratório:</label>
+                    <select id="labSelect" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="lab1">Lab. Informática 1</option>
+                        <option value="lab2">Lab. Informática 2</option>
+                        <option value="lab3">Lab. Química</option>
+                        <option value="lab4">Lab. Física</option>
+                        <option value="lab5">Lab. Biologia</option>
+                    </select>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <button id="prevMonth" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors">
+                        ← Anterior
+                    </button>
+                    <h2 id="monthYear" class="text-xl font-semibold text-gray-800 min-w-48 text-center"></h2>
+                    <button id="nextMonth" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors">
+                        Próximo →
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">Legenda de Disponibilidade</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-6 h-6 available rounded"></div>
+                    <span class="text-gray-700">Disponível</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div class="w-6 h-6 partially-occupied rounded"></div>
+                    <span class="text-gray-700">Parcialmente Ocupado</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div class="w-6 h-6 occupied rounded"></div>
+                    <span class="text-gray-700">Ocupado</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <div class="w-6 h-6 maintenance rounded"></div>
+                    <span class="text-gray-700">Manutenção</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Calendar -->
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+            <!-- Calendar Header -->
+            <div class="calendar-grid bg-blue-600 text-white">
+                <div class="p-4 text-center font-semibold">DOM</div>
+                <div class="p-4 text-center font-semibold">SEG</div>
+                <div class="p-4 text-center font-semibold">TER</div>
+                <div class="p-4 text-center font-semibold">QUA</div>
+                <div class="p-4 text-center font-semibold">QUI</div>
+                <div class="p-4 text-center font-semibold">SEX</div>
+                <div class="p-4 text-center font-semibold">SÁB</div>
+            </div>
+            
+            <!-- Calendar Body -->
+            <div id="calendarBody" class="calendar-grid bg-gray-100">
+                <!-- Calendar days will be generated here -->
+            </div>
+        </div>
+
+        <!-- Day Details Modal -->
+        <div id="dayModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 max-h-96 overflow-y-auto">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 id="modalTitle" class="text-xl font-bold text-gray-800"></h3>
+                        <button id="closeModal" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                    </div>
+                    <div id="modalContent" class="space-y-3">
+                        <!-- Schedule details will be shown here -->
+                    </div>
+                    <div id="modalActions" class="mt-6 pt-4 border-t border-gray-200">
+                        <button id="scheduleBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                            📅 Agendar Horário
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scheduling Modal -->
+        <div id="scheduleModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 id="scheduleModalTitle" class="text-xl font-bold text-gray-800">Agendar Laboratório</h3>
+                        <button id="closeScheduleModal" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                    </div>
+                    
+                    <form id="scheduleForm" class="space-y-4">
+                        <div>
+                            <label class="block text-gray-700 font-medium mb-2">Disciplina/Atividade</label>
+                            <input type="text" id="activityName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Ex: Programação I, Prática de Química..." required>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-gray-700 font-medium mb-2">Horário Início</label>
+                                <select id="startTime" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                                    <option value="">Selecione</option>
+                                    <option value="07:00">07:00</option>
+                                    <option value="08:00">08:00</option>
+                                    <option value="09:00">09:00</option>
+                                    <option value="10:00">10:00</option>
+                                    <option value="11:00">11:00</option>
+                                    <option value="13:00">13:00</option>
+                                    <option value="14:00">14:00</option>
+                                    <option value="15:00">15:00</option>
+                                    <option value="16:00">16:00</option>
+                                    <option value="17:00">17:00</option>
+                                    <option value="18:00">18:00</option>
+                                    <option value="19:00">19:00</option>
+                                    <option value="20:00">20:00</option>
+                                    <option value="21:00">21:00</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 font-medium mb-2">Horário Fim</label>
+                                <select id="endTime" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                                    <option value="">Selecione</option>
+                                    <option value="08:00">08:00</option>
+                                    <option value="09:00">09:00</option>
+                                    <option value="10:00">10:00</option>
+                                    <option value="11:00">11:00</option>
+                                    <option value="12:00">12:00</option>
+                                    <option value="14:00">14:00</option>
+                                    <option value="15:00">15:00</option>
+                                    <option value="16:00">16:00</option>
+                                    <option value="17:00">17:00</option>
+                                    <option value="18:00">18:00</option>
+                                    <option value="19:00">19:00</option>
+                                    <option value="20:00">20:00</option>
+                                    <option value="21:00">21:00</option>
+                                    <option value="22:00">22:00</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 font-medium mb-2">Número de Alunos</label>
+                            <input type="number" id="studentCount" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Ex: 25" min="1" max="50" required>
+                        </div>
+                        
+                        <div>
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="needMaterials" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                <span class="text-gray-700 font-medium">Solicitar materiais específicos</span>
+                            </label>
+                        </div>
+                        
+                        <div id="materialsSection" class="hidden">
+                            <label class="block text-gray-700 font-medium mb-2">Lista de Materiais Necessários</label>
+                            <textarea id="materialsList" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-24" placeholder="Ex: 
+- 25 computadores funcionando
+- Projetor e tela
+- Software específico: Visual Studio Code
+- Cabos HDMI
+- Extensões elétricas"></textarea>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-gray-700 font-medium mb-2">Observações (opcional)</label>
+                            <textarea id="observations" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20" placeholder="Informações adicionais sobre a aula..."></textarea>
+                        </div>
+                        
+                        <div class="flex space-x-4 pt-4">
+                            <button type="button" id="cancelSchedule" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold py-2 px-4 rounded-lg transition-colors">
+                                Cancelar
+                            </button>
+                            <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                                Confirmar Agendamento
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Modal -->
+        <div id="dashboardModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-2xl font-bold text-gray-800">📊 Dashboard de Controle</h3>
+                        <button id="closeDashboard" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                    </div>
+                    
+                    <!-- Stats Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-blue-100 p-4 rounded-lg">
+                            <div class="text-blue-600 text-2xl font-bold" id="totalBookings">0</div>
+                            <div class="text-blue-800 text-sm">Agendamentos Totais</div>
+                        </div>
+                        <div class="bg-green-100 p-4 rounded-lg">
+                            <div class="text-green-600 text-2xl font-bold" id="thisMonthBookings">0</div>
+                            <div class="text-green-800 text-sm">Este Mês</div>
+                        </div>
+                        <div class="bg-yellow-100 p-4 rounded-lg">
+                            <div class="text-yellow-600 text-2xl font-bold" id="pendingMaterials">0</div>
+                            <div class="text-yellow-800 text-sm">Materiais Pendentes</div>
+                        </div>
+                        <div class="bg-purple-100 p-4 rounded-lg">
+                            <div class="text-purple-600 text-2xl font-bold" id="mostUsedLab">-</div>
+                            <div class="text-purple-800 text-sm">Lab Mais Usado</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Recent Bookings -->
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-4">Agendamentos Recentes</h4>
+                        <div id="recentBookings" class="space-y-3">
+                            <!-- Recent bookings will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentUser = null;
+        let currentDate = new Date();
+        let currentLab = 'lab1';
+        let selectedDay = null;
+        let userBookings = JSON.parse(localStorage.getItem('userBookings')) || [];
+
+        // Sample data for laboratory schedules
+        const labSchedules = {
+            lab1: {
+                name: "Laboratório de Informática 1",
+                capacity: 30,
+                schedule: {
+                    1: { status: 'available', classes: [] },
+                    2: { status: 'occupied', classes: ['Programação I - 08:00-10:00', 'Banco de Dados - 14:00-16:00'] },
+                    3: { status: 'partially-occupied', classes: ['Algoritmos - 10:00-12:00'] },
+                    4: { status: 'available', classes: [] },
+                    5: { status: 'occupied', classes: ['Programação II - 08:00-12:00', 'Redes - 14:00-18:00'] },
+                    8: { status: 'maintenance', classes: ['Manutenção preventiva'] },
+                    9: { status: 'occupied', classes: ['Estrutura de Dados - 08:00-10:00', 'Web Design - 14:00-16:00'] },
+                    10: { status: 'partially-occupied', classes: ['JavaScript - 16:00-18:00'] },
+                    12: { status: 'occupied', classes: ['Python - 08:00-12:00'] },
+                    15: { status: 'available', classes: [] },
+                    16: { status: 'occupied', classes: ['Java - 08:00-10:00', 'C++ - 14:00-16:00'] },
+                    17: { status: 'partially-occupied', classes: ['Mobile Dev - 10:00-12:00'] },
+                    19: { status: 'occupied', classes: ['IA - 08:00-12:00', 'Machine Learning - 14:00-18:00'] },
+                    22: { status: 'maintenance', classes: ['Atualização de software'] },
+                    23: { status: 'available', classes: [] },
+                    24: { status: 'occupied', classes: ['Projeto Final - 08:00-18:00'] },
+                    26: { status: 'partially-occupied', classes: ['Revisão - 14:00-16:00'] },
+                    29: { status: 'available', classes: [] },
+                    30: { status: 'occupied', classes: ['Apresentações - 08:00-12:00'] }
+                }
+            },
+            lab2: {
+                name: "Laboratório de Informática 2",
+                capacity: 25,
+                schedule: {
+                    1: { status: 'partially-occupied', classes: ['Sistemas Operacionais - 14:00-16:00'] },
+                    3: { status: 'available', classes: [] },
+                    5: { status: 'occupied', classes: ['Compiladores - 08:00-12:00'] },
+                    7: { status: 'maintenance', classes: ['Limpeza e manutenção'] },
+                    10: { status: 'available', classes: [] },
+                    12: { status: 'occupied', classes: ['Engenharia de Software - 08:00-18:00'] },
+                    14: { status: 'partially-occupied', classes: ['Testes de Software - 10:00-12:00'] },
+                    17: { status: 'available', classes: [] },
+                    19: { status: 'occupied', classes: ['Arquitetura de Computadores - 08:00-16:00'] },
+                    21: { status: 'maintenance', classes: ['Upgrade de hardware'] },
+                    24: { status: 'available', classes: [] },
+                    26: { status: 'occupied', classes: ['Segurança da Informação - 14:00-18:00'] },
+                    28: { status: 'partially-occupied', classes: ['Seminário - 16:00-18:00'] }
+                }
+            },
+            lab3: {
+                name: "Laboratório de Química",
+                capacity: 20,
+                schedule: {
+                    2: { status: 'occupied', classes: ['Química Orgânica - 08:00-12:00'] },
+                    4: { status: 'available', classes: [] },
+                    9: { status: 'partially-occupied', classes: ['Análise Química - 14:00-16:00'] },
+                    11: { status: 'maintenance', classes: ['Calibração de equipamentos'] },
+                    16: { status: 'occupied', classes: ['Química Analítica - 08:00-18:00'] },
+                    18: { status: 'available', classes: [] },
+                    23: { status: 'occupied', classes: ['Bioquímica - 10:00-14:00'] },
+                    25: { status: 'available', classes: [] },
+                    30: { status: 'partially-occupied', classes: ['Revisão - 16:00-18:00'] }
+                }
+            },
+            lab4: {
+                name: "Laboratório de Física",
+                capacity: 24,
+                schedule: {
+                    1: { status: 'occupied', classes: ['Física Experimental I - 08:00-12:00'] },
+                    3: { status: 'available', classes: [] },
+                    8: { status: 'partially-occupied', classes: ['Óptica - 14:00-16:00'] },
+                    10: { status: 'maintenance', classes: ['Manutenção de equipamentos'] },
+                    15: { status: 'occupied', classes: ['Mecânica - 08:00-18:00'] },
+                    17: { status: 'available', classes: [] },
+                    22: { status: 'occupied', classes: ['Eletromagnetismo - 10:00-14:00'] },
+                    24: { status: 'available', classes: [] },
+                    29: { status: 'partially-occupied', classes: ['Termodinâmica - 16:00-18:00'] }
+                }
+            },
+            lab5: {
+                name: "Laboratório de Biologia",
+                capacity: 18,
+                schedule: {
+                    2: { status: 'occupied', classes: ['Microbiologia - 08:00-12:00'] },
+                    5: { status: 'available', classes: [] },
+                    7: { status: 'partially-occupied', classes: ['Genética - 14:00-16:00'] },
+                    12: { status: 'maintenance', classes: ['Esterilização de materiais'] },
+                    14: { status: 'occupied', classes: ['Biologia Molecular - 08:00-18:00'] },
+                    19: { status: 'available', classes: [] },
+                    21: { status: 'occupied', classes: ['Anatomia - 10:00-14:00'] },
+                    26: { status: 'available', classes: [] },
+                    28: { status: 'partially-occupied', classes: ['Botânica - 16:00-18:00'] }
+                }
+            }
+        };
+
+        // Authentication functions
+        function handleCredentialResponse(response) {
+            // In a real implementation, you would verify the JWT token
+            // For demo purposes, we'll simulate a successful login
+            currentUser = {
+                name: "Professor Demo",
+                email: "professor@faculdadelogos.edu.br",
+                picture: "https://via.placeholder.com/40"
+            };
+            showMainApp();
+        }
+
+        function showMainApp() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            document.getElementById('userName').textContent = currentUser.name;
+            updateCurrentDate();
+            updateMonthYear();
+            generateCalendar();
+            updateDashboard();
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+        }
+
+        // Calendar functions
+        function updateCurrentDate() {
+            const now = new Date();
+            const options = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            };
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('pt-BR', options);
+        }
+
+        function updateMonthYear() {
+            const options = { year: 'numeric', month: 'long' };
+            document.getElementById('monthYear').textContent = currentDate.toLocaleDateString('pt-BR', options);
+        }
+
+        function getDaysInMonth(date) {
+            return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+        }
+
+        function getFirstDayOfMonth(date) {
+            return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+        }
+
+        function generateCalendar() {
+            const calendarBody = document.getElementById('calendarBody');
+            calendarBody.innerHTML = '';
+
+            const daysInMonth = getDaysInMonth(currentDate);
+            const firstDay = getFirstDayOfMonth(currentDate);
+            const schedule = labSchedules[currentLab].schedule;
+
+            // Add empty cells for days before the first day of the month
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'day-cell bg-gray-50';
+                calendarBody.appendChild(emptyCell);
+            }
+
+            // Add days of the month
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div');
+                const dayData = schedule[day] || { status: 'available', classes: [] };
+                
+                dayCell.className = `day-cell ${dayData.status} text-white cursor-pointer relative`;
+                dayCell.innerHTML = `
+                    <div class="p-3 h-full flex flex-col">
+                        <div class="font-semibold text-lg mb-1">${day}</div>
+                        <div class="text-xs opacity-90">
+                            ${dayData.classes.length > 0 ? `${dayData.classes.length} aula(s)` : 'Livre'}
+                        </div>
+                    </div>
+                `;
+
+                dayCell.addEventListener('click', () => showDayDetails(day, dayData));
+                calendarBody.appendChild(dayCell);
+            }
+        }
+
+        function showDayDetails(day, dayData) {
+            selectedDay = day;
+            const modal = document.getElementById('dayModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+            const scheduleBtn = document.getElementById('scheduleBtn');
+
+            const dayName = new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+            modalTitle.textContent = `${dayName} - ${labSchedules[currentLab].name}`;
+
+            let content = '';
+            if (dayData.classes.length === 0) {
+                content = '<div class="text-green-600 font-medium">✅ Laboratório disponível o dia todo</div>';
+                scheduleBtn.style.display = 'block';
+            } else {
+                content = '<div class="space-y-2">';
+                dayData.classes.forEach(classInfo => {
+                    const isMaintenanceClass = classInfo.includes('Manutenção') || classInfo.includes('manutenção') || classInfo.includes('Limpeza') || classInfo.includes('Upgrade');
+                    const iconClass = isMaintenanceClass ? '🔧' : '📚';
+                    const textClass = isMaintenanceClass ? 'text-gray-600' : 'text-blue-600';
+                    content += `<div class="${textClass} font-medium">${iconClass} ${classInfo}</div>`;
+                });
+                content += '</div>';
+                
+                if (dayData.status === 'partially-occupied') {
+                    scheduleBtn.style.display = 'block';
+                    scheduleBtn.textContent = '📅 Agendar Horário Disponível';
+                } else if (dayData.status === 'maintenance') {
+                    scheduleBtn.style.display = 'none';
+                } else {
+                    scheduleBtn.style.display = 'none';
+                }
+            }
+
+            modalContent.innerHTML = content;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        // Scheduling functions
+        function showScheduleModal() {
+            const scheduleModal = document.getElementById('scheduleModal');
+            const scheduleModalTitle = document.getElementById('scheduleModalTitle');
+            
+            const dayName = new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDay).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+            scheduleModalTitle.textContent = `Agendar ${labSchedules[currentLab].name} - ${dayName}`;
+            
+            // Close day modal
+            document.getElementById('dayModal').classList.add('hidden');
+            document.getElementById('dayModal').classList.remove('flex');
+            
+            // Show schedule modal
+            scheduleModal.classList.remove('hidden');
+            scheduleModal.classList.add('flex');
+        }
+
+        function handleScheduleSubmit(e) {
+            e.preventDefault();
+            
+            const formData = {
+                id: Date.now(),
+                date: new Date(currentDate.getFullYear(), currentDate.getMonth(), selectedDay),
+                lab: currentLab,
+                labName: labSchedules[currentLab].name,
+                activity: document.getElementById('activityName').value,
+                startTime: document.getElementById('startTime').value,
+                endTime: document.getElementById('endTime').value,
+                studentCount: parseInt(document.getElementById('studentCount').value),
+                needMaterials: document.getElementById('needMaterials').checked,
+                materialsList: document.getElementById('materialsList').value,
+                observations: document.getElementById('observations').value,
+                professor: currentUser.name,
+                status: 'confirmed',
+                createdAt: new Date()
+            };
+
+            // Add to user bookings
+            userBookings.push(formData);
+            localStorage.setItem('userBookings', JSON.stringify(userBookings));
+
+            // Update lab schedule
+            const scheduleKey = selectedDay;
+            if (!labSchedules[currentLab].schedule[scheduleKey]) {
+                labSchedules[currentLab].schedule[scheduleKey] = { status: 'occupied', classes: [] };
+            }
+            
+            const timeSlot = `${formData.activity} - ${formData.startTime}-${formData.endTime}`;
+            labSchedules[currentLab].schedule[scheduleKey].classes.push(timeSlot);
+            
+            // Update status based on number of classes
+            if (labSchedules[currentLab].schedule[scheduleKey].classes.length === 1) {
+                labSchedules[currentLab].schedule[scheduleKey].status = 'partially-occupied';
+            } else {
+                labSchedules[currentLab].schedule[scheduleKey].status = 'occupied';
+            }
+
+            // Close modal and refresh calendar
+            closeScheduleModal();
+            generateCalendar();
+            updateDashboard();
+
+            // Show success message
+            alert('✅ Agendamento realizado com sucesso!');
+        }
+
+        function closeScheduleModal() {
+            document.getElementById('scheduleModal').classList.add('hidden');
+            document.getElementById('scheduleModal').classList.remove('flex');
+            document.getElementById('scheduleForm').reset();
+            document.getElementById('materialsSection').classList.add('hidden');
+        }
+
+        // Dashboard functions
+        function updateDashboard() {
+            const totalBookings = userBookings.length;
+            const currentMonth = new Date().getMonth();
+            const currentYear = new Date().getFullYear();
+            
+            const thisMonthBookings = userBookings.filter(booking => {
+                const bookingDate = new Date(booking.date);
+                return bookingDate.getMonth() === currentMonth && bookingDate.getFullYear() === currentYear;
+            }).length;
+
+            const pendingMaterials = userBookings.filter(booking => booking.needMaterials).length;
+
+            // Calculate most used lab
+            const labUsage = {};
+            userBookings.forEach(booking => {
+                labUsage[booking.lab] = (labUsage[booking.lab] || 0) + 1;
+            });
+            
+            let mostUsedLab = '-';
+            let maxUsage = 0;
+            for (const [lab, usage] of Object.entries(labUsage)) {
+                if (usage > maxUsage) {
+                    maxUsage = usage;
+                    mostUsedLab = labSchedules[lab].name.split(' ')[2] || lab; // Get lab number/name
+                }
+            }
+
+            document.getElementById('totalBookings').textContent = totalBookings;
+            document.getElementById('thisMonthBookings').textContent = thisMonthBookings;
+            document.getElementById('pendingMaterials').textContent = pendingMaterials;
+            document.getElementById('mostUsedLab').textContent = mostUsedLab;
+
+            // Update recent bookings
+            const recentBookings = userBookings
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                .slice(0, 5);
+
+            const recentBookingsContainer = document.getElementById('recentBookings');
+            recentBookingsContainer.innerHTML = '';
+
+            if (recentBookings.length === 0) {
+                recentBookingsContainer.innerHTML = '<p class="text-gray-500">Nenhum agendamento realizado ainda.</p>';
+            } else {
+                recentBookings.forEach(booking => {
+                    const bookingDate = new Date(booking.date).toLocaleDateString('pt-BR');
+                    const div = document.createElement('div');
+                    div.className = 'bg-white p-3 rounded-lg border border-gray-200';
+                    div.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="font-medium text-gray-800">${booking.activity}</div>
+                                <div class="text-sm text-gray-600">${booking.labName} - ${bookingDate}</div>
+                                <div class="text-sm text-gray-500">${booking.startTime} às ${booking.endTime} | ${booking.studentCount} alunos</div>
+                            </div>
+                            <div class="text-xs text-gray-400">
+                                ${booking.needMaterials ? '📦 Materiais' : ''}
+                            </div>
+                        </div>
+                    `;
+                    recentBookingsContainer.appendChild(div);
+                });
+            }
+        }
+
+        function showDashboard() {
+            updateDashboard();
+            document.getElementById('dashboardModal').classList.remove('hidden');
+            document.getElementById('dashboardModal').classList.add('flex');
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Login events
+            document.getElementById('demoLogin').addEventListener('click', () => {
+                currentUser = {
+                    name: "Prof. João Silva",
+                    email: "joao.silva@faculdadelogos.edu.br",
+                    picture: "https://via.placeholder.com/40"
+                };
+                showMainApp();
+            });
+
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+
+            // Calendar events
+            document.getElementById('labSelect').addEventListener('change', (e) => {
+                currentLab = e.target.value;
+                generateCalendar();
+            });
+
+            document.getElementById('prevMonth').addEventListener('click', () => {
+                currentDate.setMonth(currentDate.getMonth() - 1);
+                updateMonthYear();
+                generateCalendar();
+            });
+
+            document.getElementById('nextMonth').addEventListener('click', () => {
+                currentDate.setMonth(currentDate.getMonth() + 1);
+                updateMonthYear();
+                generateCalendar();
+            });
+
+            // Modal events
+            document.getElementById('closeModal').addEventListener('click', () => {
+                document.getElementById('dayModal').classList.add('hidden');
+                document.getElementById('dayModal').classList.remove('flex');
+            });
+
+            document.getElementById('scheduleBtn').addEventListener('click', showScheduleModal);
+
+            // Schedule modal events
+            document.getElementById('closeScheduleModal').addEventListener('click', closeScheduleModal);
+            document.getElementById('cancelSchedule').addEventListener('click', closeScheduleModal);
+            document.getElementById('scheduleForm').addEventListener('submit', handleScheduleSubmit);
+
+            // Materials checkbox
+            document.getElementById('needMaterials').addEventListener('change', (e) => {
+                const materialsSection = document.getElementById('materialsSection');
+                if (e.target.checked) {
+                    materialsSection.classList.remove('hidden');
+                } else {
+                    materialsSection.classList.add('hidden');
+                }
+            });
+
+            // Dashboard events
+            document.getElementById('dashboardBtn').addEventListener('click', showDashboard);
+            document.getElementById('closeDashboard').addEventListener('click', () => {
+                document.getElementById('dashboardModal').classList.add('hidden');
+                document.getElementById('dashboardModal').classList.remove('flex');
+            });
+
+            // Close modals when clicking outside
+            document.getElementById('dayModal').addEventListener('click', (e) => {
+                if (e.target.id === 'dayModal') {
+                    document.getElementById('dayModal').classList.add('hidden');
+                    document.getElementById('dayModal').classList.remove('flex');
+                }
+            });
+
+            document.getElementById('scheduleModal').addEventListener('click', (e) => {
+                if (e.target.id === 'scheduleModal') {
+                    closeScheduleModal();
+                }
+            });
+
+            document.getElementById('dashboardModal').addEventListener('click', (e) => {
+                if (e.target.id === 'dashboardModal') {
+                    document.getElementById('dashboardModal').classList.add('hidden');
+                    document.getElementById('dashboardModal').classList.remove('flex');
+                }
+            });
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'973510be8376521f',t:'MTc1NTg5Mzk2OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
